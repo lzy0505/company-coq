@@ -1986,7 +1986,7 @@ return the starting point as well."
                         (format company-coq-symbols-meta-cmd name))))
     (company-coq-truncate-to-minibuf
      (company-coq--fontify-string
-      (replace-regexp-in-string "\\s-+" " " (company-coq-trim output))))))
+      (replace-regexp-in-string " where .+" "" (replace-regexp-in-string "\\s-+" " " output))))))
 
 (defun company-coq-meta-refman (name)
   "Compute company's meta for value NAME.
