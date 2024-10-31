@@ -475,7 +475,7 @@ The result matches any symbol in HEADERS, followed by BODY."
 (defconst company-coq-tactic-def-cmd "Print Ltac %s"
   "Command used to retrieve the documentation of a tactic.")
 
-(defconst company-coq-symbols-meta-cmd "Check @%s."
+(defconst company-coq-symbols-meta-cmd "Check %s."
   "Command used to retrieve a short description of a symbol.")
 
 (defconst company-coq-modules-cmd "Print LoadPath."
@@ -1974,9 +1974,10 @@ return the starting point as well."
 
 (defun company-coq-truncate-to-minibuf (str)
   "Truncate STR for display in minibuffer."
-  (when str
-    ;; (- … 10) adds some padding to compensate for wide characters
-    (truncate-string-to-width str (max 5 (- (window-body-width (minibuffer-window)) 10)) 0 nil "…")))
+  ;; (when str
+  ;;   ;; (- … 10) adds some padding to compensate for wide characters
+  ;;   (truncate-string-to-width str (max 5 (- (window-body-width (minibuffer-window)) 10)) 0 nil "…")))
+  str)
 
 (defun company-coq-meta-symbol (name)
   "Compute company's meta for symbol NAME."
@@ -1985,7 +1986,7 @@ return the starting point as well."
                         (format company-coq-symbols-meta-cmd name))))
     (company-coq-truncate-to-minibuf
      (company-coq--fontify-string
-      (replace-regexp-in-string "\\s-+" " " (company-coq-trim output))))))
+      (replace-regexp-in-string " where .+" "" (replace-regexp-in-string "\\s-+" " " output))))))
 
 (defun company-coq-meta-refman (name)
   "Compute company's meta for value NAME.
