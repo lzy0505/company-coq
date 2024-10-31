@@ -746,7 +746,7 @@ Useful as a value for `company-coq-completion-predicate'."
       (setq company-coq--reserved-keywords-regexp
             (concat "^" (regexp-opt (append coq-reserved '("Set" "Prop" "Type"))) "$"))))
 
-(defconst company-coq--doc-buffer "*company-coq: documentation*"
+(defconst company-coq--doc-buffer "*coq-documentation*"
   "Name to give to company-coq documentation buffers.")
 
 (defconst company-coq--goal-diff-buffer "*goal-diff*"
@@ -840,7 +840,7 @@ Useful as a value for `company-coq-completion-predicate'."
 
 (defmacro company-coq-dbg (format &rest args)
   "Call `message' with FORMAT and ARGS if `company-coq-debug' is non-nil."
-  `(when company-coq-debug
+  `(when t ;company-coq-debug
      (message (concat "company-coq: " ,format) ,@args)))
 
 (defmacro company-coq-suppress-warnings (&rest body)
@@ -1904,7 +1904,7 @@ Return non-nil iff such a window was found."
   (unless (window-live-p company-coq-goals-window)
     (setq company-coq-goals-window (company-coq-get-goals-window)))
   ;; Hide the docs and redisplay the goals buffer
-  (dolist (buf `(,company-coq--doc-buffer
+  (dolist (buf `(;; ,company-coq--doc-buffer
                  ,company-coq--goal-diff-buffer
                  ,company-coq--unification-diff-buffer))
     (when (setq buf (get-buffer buf))
@@ -2012,7 +2012,7 @@ If NAME has an 'anchor text property, returns a help message."
   ;; manual, lest they cause an out of memory exception when rendering (eg. for
   ;; the "mutually co-inductive records error" documentation)
   (company-coq-dbg "Called company-coq-display-in-pg-buffer with %s" buffer)
-  (-if-let* ((pg-window (company-coq-get-goals-window)))
+  (-if-let* ((pg-window (company-coq-get-response-window)))
       (progn (set-window-dedicated-p pg-window nil)
              (set-window-buffer pg-window buffer)
              pg-window)
@@ -2054,22 +2054,23 @@ KILL: See `quit-window'."
   (setq-local cursor-in-non-selected-windows nil))
 
 (defmacro company-coq-with-clean-doc-buffer (&rest body)
-  "Run BODY in a clean documentation buffer."
+  "Run BODY in a clean documentation buffer, BUT don't show the buffer in a window."
   (declare (indent defun)
            (debug body))
   `(progn
      (company-coq-dbg "company-prepare-doc-buffer: Called")
      (prog1
          (let ((doc-buffer (get-buffer-create company-coq--doc-buffer)))
-           (with-selected-window (company-coq-display-in-pg-window doc-buffer)
+           ;; (with-selected-window (company-coq-display-in-pg-window doc-buffer)
              (with-current-buffer doc-buffer
                (let ((inhibit-read-only t))
                  (erase-buffer)
                  (remove-overlays)
                  (fundamental-mode)
                  (prog1 (progn ,@body)
-                   (company-coq--setup-doc-buffer))))))
-       (company-coq--record-selected-window))))
+                   (company-coq--setup-doc-buffer))))
+       ;; (company-coq--record-selected-window)
+       ))))
 
 (defun company-coq-scroll-above-definition-at-pt ()
   "Highlight the current line and scroll up to for context."
@@ -2387,9 +2388,10 @@ If INTERACTIVE is non-nil and no help is found, complain loudly."
   (company-coq-dbg "company-coq-doc-buffer-generic: Called for name %s" name)
   (-if-let* ((chapters (company-coq-doc-buffer-collect-outputs name cmds)))
       (let* ((fontized-name (propertize name 'font-lock-face 'company-coq-doc-i-face))
-             (doc-tagline   (format company-coq-doc-tagline fontized-name))
-             (doc-body      (mapconcat #'identity chapters company-coq-doc-def-sep))
-             (doc-full      (concat doc-tagline "\n\n" doc-body)))
+             ;; (doc-tagline   (format company-coq-doc-tagline fontized-name))
+             (doc-full      (mapconcat #'identity chapters company-coq-doc-def-sep))
+             ;; (doc-full      (concat doc-tagline "\n\n" doc-body))
+             )
         (company-coq-with-clean-doc-buffer
           (insert doc-full)
           (coq-response-mode)
@@ -2400,8 +2402,10 @@ If INTERACTIVE is non-nil and no help is found, complain loudly."
 
 (defun company-coq-doc-buffer-symbol (name)
   "Prepare a company doc buffer for symbol NAME."
-  (company-coq-doc-buffer-generic name (list company-coq-doc-cmd
-                                  company-coq-def-cmd)))
+  (company-coq-doc-buffer-generic name (list ;; company-coq-doc-cmd
+                                  ;;company-coq-def-cmd
+                                  company-coq-type-cmd
+                                  )))
 
 (defun company-coq-doc-buffer-definition (name)
   "Prepare a company doc buffer for definition NAME."
