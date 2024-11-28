@@ -840,7 +840,7 @@ Useful as a value for `company-coq-completion-predicate'."
 
 (defmacro company-coq-dbg (format &rest args)
   "Call `message' with FORMAT and ARGS if `company-coq-debug' is non-nil."
-  `(when t ;company-coq-debug
+  `(when company-coq-debug
      (message (concat "company-coq: " ,format) ,@args)))
 
 (defmacro company-coq-suppress-warnings (&rest body)
@@ -2052,25 +2052,26 @@ KILL: See `quit-window'."
   (company-coq--temp-buffer-minor-mode)
   (company-coq--setup-secondary-buffer)
   (setq-local show-trailing-whitespace nil)
-  (setq-local cursor-in-non-selected-windows nil))
+  (setq-local cursor-in-non-selected-windows nil)
+  )
 
 (defmacro company-coq-with-clean-doc-buffer (&rest body)
-  "Run BODY in a clean documentation buffer, BUT don't show the buffer in a window."
+  "Run BODY in a clean documentation buffer."
   (declare (indent defun)
            (debug body))
   `(progn
      (company-coq-dbg "company-prepare-doc-buffer: Called")
      (prog1
          (let ((doc-buffer (get-buffer-create company-coq--doc-buffer)))
-           ;; (with-selected-window (company-coq-display-in-pg-window doc-buffer)
+           (with-selected-window (company-coq-display-in-pg-window doc-buffer)
              (with-current-buffer doc-buffer
                (let ((inhibit-read-only t))
                  (erase-buffer)
                  (remove-overlays)
                  (fundamental-mode)
                  (prog1 (progn ,@body)
-                   (company-coq--setup-doc-buffer))))
-       ;; (company-coq--record-selected-window)
+                   (company-coq--setup-doc-buffer)))))
+             (company-coq--record-selected-window)
        ))))
 
 (defun company-coq-scroll-above-definition-at-pt ()
@@ -2389,9 +2390,9 @@ If INTERACTIVE is non-nil and no help is found, complain loudly."
   (company-coq-dbg "company-coq-doc-buffer-generic: Called for name %s" name)
   (-if-let* ((chapters (company-coq-doc-buffer-collect-outputs name cmds)))
       (let* ((fontized-name (propertize name 'font-lock-face 'company-coq-doc-i-face))
-             ;; (doc-tagline   (format company-coq-doc-tagline fontized-name))
-             (doc-full      (mapconcat #'identity chapters company-coq-doc-def-sep))
-             ;; (doc-full      (concat doc-tagline "\n\n" doc-body))
+             (doc-tagline   (format company-coq-doc-tagline fontized-name))
+             (doc-body      (mapconcat #'identity chapters company-coq-doc-def-sep))
+             (doc-full      (concat doc-tagline "\n\n" doc-body))
              )
         (company-coq-with-clean-doc-buffer
           (insert doc-full)
@@ -2401,12 +2402,24 @@ If INTERACTIVE is non-nil and no help is found, complain loudly."
           (current-buffer)))
     (company-coq--maybe-complain-docs-not-found interactive "documentation" name)))
 
+(defun company-coq-quickhelp-generic (name cmds)
+  "Prepare a quick doc string for NAME, using CMDS to collect information."
+  (company-coq-dbg "company-coq-quickhelp-generic: Called for name %s" name)
+  (-if-let* ((chapters (company-coq-doc-buffer-collect-outputs name cmds)))
+      (let* ((string-full     (mapconcat #'identity chapters company-coq-doc-def-sep)))
+        string-full)))
+
 (defun company-coq-doc-buffer-symbol (name)
   "Prepare a company doc buffer for symbol NAME."
-  (company-coq-doc-buffer-generic name (list ;; company-coq-doc-cmd
-                                  ;;company-coq-def-cmd
-                                  company-coq-type-cmd
-                                  )))
+  (company-coq-doc-buffer-generic name (list company-coq-doc-cmd
+                                  company-coq-def-cmd
+                                  company-coq-type-cmd)))
+
+(defun company-coq-quickhelp-symbol (name)
+  "Prepare a company doc buffer for symbol NAME."
+  (company-coq-quickhelp-generic name (list
+                                  company-coq-def-cmd
+                                  company-coq-type-cmd)))
 
 (defun company-coq-doc-buffer-definition (name)
   "Prepare a company doc buffer for definition NAME."
@@ -2414,10 +2427,19 @@ If INTERACTIVE is non-nil and no help is found, complain loudly."
                                   company-coq-def-cmd
                                   company-coq-tactic-def-cmd)))
 
+(defun company-coq-quickhelp-definition (name)
+  "Prepare a company doc buffer for definition NAME."
+  (company-coq-quickhelp-generic name (list company-coq-doc-cmd)))
+
 (defun company-coq-doc-buffer-tactic (name)
   "Prepare a company doc buffer for tactic NAME."
   (setq name (replace-regexp-in-string " .*" "" name))
   (company-coq-doc-buffer-generic name (list company-coq-tactic-def-cmd)))
+
+(defun company-coq-quickhelp-tactic (name)
+  "Prepare a company doc buffer for tactic NAME."
+  (setq name (replace-regexp-in-string " .*" "" name))
+  (company-coq-quickhelp-generic name (list company-coq-tactic-def-cmd)))
 
 (defun company-coq-doc (name cmds)
   "Show documentation for NAME, using CMDS to build docs.
@@ -2903,6 +2925,7 @@ COMMAND, ARG and IGNORED: see `company-backends'."
     (`match (company-coq-get-prop 'match-end arg))
     (`annotation "def")
     (`location (company-coq-location-symbol arg))
+    (`quickhelp-string (company-coq-quickhelp-symbol arg))
     (`doc-buffer (company-coq-doc-buffer-symbol arg))
     (`comparison-fun #'company-coq-string-lessp-match-beginning)
     (`require-match 'never)))
@@ -2923,6 +2946,7 @@ COMMAND, ARG and IGNORED: see `company-backends'."
     (`annotation (company-coq-annotation-tactic arg))
     (`location (company-coq-location-tactic arg))
     (`post-completion (company-coq-post-completion-snippet arg))
+    (`quickhelp-string (company-coq-quickhelp-tactic arg))
     (`doc-buffer (company-coq-doc-buffer-tactic arg))
     (`comparison-fun #'company-coq-string-lessp-match-beginning)
     (`require-match 'never)))
@@ -2944,6 +2968,7 @@ COMMAND, ARG and IGNORED: see `company-backends'."
     (`match (company-coq-get-prop 'match-end arg))
     (`annotation "ldef")
     (`location (company-coq-location-local-definition arg))
+    (`quickhelp-string (company-coq-quickhelp-definition arg))
     (`doc-buffer (company-coq-doc-buffer-definition arg))
     (`comparison-fun #'company-coq-string-lessp-match-beginning)
     (`require-match 'never)))
@@ -2995,7 +3020,7 @@ backend.  COMMAND, ARG and IGNORED: see `company-backends'."
   (interactive (list 'interactive))
   (pcase command
     (`meta (company-coq-meta-refman arg))
-    (`doc-buffer (company-coq-doc-buffer-refman arg))
+    ;; (`doc-buffer (company-coq-doc-buffer-refman arg))
     (`location (company-coq-doc-buffer-refman arg))
     (`annotation (company-coq-annotation-snippet "ref" arg))
     (`sorted t) ;; The static abbrevs cache is kept sorted
